@@ -26,7 +26,7 @@ const Input = (() => {
     mouse.aim = true;
     mouse.moved = performance.now();
   });
-  window.addEventListener('mousedown', e => { if (Touch.on) return; if (e.button === 0) mouse.left++; else if (e.button === 2) mouse.right++; });
+  window.addEventListener('mousedown', e => { if (Touch.on || Touch.eatClick()) return; if (e.button === 0) mouse.left++; else if (e.button === 2) mouse.right++; });
   window.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('wheel', e => { mouse.wheel += e.deltaY; mouse.wheelAt = performance.now(); e.preventDefault(); }, { passive: false });
 
@@ -130,11 +130,13 @@ const Input = (() => {
       if (s.kind === 'pad' && !seen.has(id) && s.connected) Object.assign(s, blank(id, 'pad', s.name), { connected: false });
     }
     for (const id in KB) pollKeyboard(id, now);
+    const ts = states.get('touch');
     if (Touch.on) {
-      let s = states.get('touch');
+      let s = ts;
       if (!s) { s = blank('touch', 'touch', 'Pantalla táctil'); states.set('touch', s); }
+      s.connected = true;
       Touch.poll(s);
-    }
+    } else if (ts) ts.connected = false;
   }
 
   function rumble(id, strong, weak, ms) {

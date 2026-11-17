@@ -952,6 +952,7 @@ function drawTitle(ctx, G, t) {
     size: 18, weight: 600, align: 'center', color: pads ? T.muted : T.warn,
   });
   if (!Sfx.running()) txt(ctx, 'Haz clic en la pantalla para activar el sonido', cx, W.H - 58, { size: 18, weight: 700, align: 'center', color: T.warn });
+  Touch.drawToggle(ctx);
 }
 
 // ─── Resultados ───

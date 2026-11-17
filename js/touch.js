@@ -1,12 +1,21 @@
 'use strict';
 /* Celulares y tabletas: botones en pantalla, diseño compacto (letras y botones más grandes)
-   y aviso para girar el teléfono. Se activa sólo en pantallas táctiles;
+   y aviso para girar el teléfono.
+   Cuándo se activa: solo en celulares y tabletas, o con el primer toque de un dedo en la pantalla,
+   o con el botón "Modo celular / Modo computadora" del título (se recuerda en ese navegador).
    ?tactil=1 lo fuerza (para probarlo con el ratón) y ?tactil=0 lo apaga.
    Controles: mantener las flechas de la izquierda gira el escudo; los botones de la derecha eligen el material. */
 
 const Touch = (() => {
   const q = new URLSearchParams(location.search).get('tactil');
-  const on = q === '1' || (q !== '0' && !!window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
+  let pref = q === '1' ? 'tactil' : q === '0' ? 'normal' : null; // modo elegido a propósito
+  if (!pref) { try { pref = localStorage.getItem('cazadores-modo'); } catch (e) { /* sin almacenamiento */ } }
+  const mm = s => !!window.matchMedia && matchMedia(s).matches;
+  const auto = mm('(hover: none) and (pointer: coarse)') || (navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 600);
+  let on = pref === 'tactil' || (pref !== 'normal' && auto);
+  // en la expo (el juego abierto como archivo, sin internet) no aparece el botón de modo
+  const showToggle = location.protocol !== 'file:';
+  let swallow = false; // el clic que cambió de modo no cuenta para unirse al juego
   const COL = 340;                  // columna de cada lado para los botones (con su margen)
   const MIN_W = 1600, MIN_H = 820;  // pantalla lógica mínima: en un celular todo se ve más grande
   const TYPES = ['alpha', 'beta', 'gamma', 'neutron'];
@@ -20,6 +29,18 @@ const Touch = (() => {
     return { x: (e.clientX - r.left) / r.width * World.W, y: (e.clientY - r.top) / r.height * World.H };
   }
   const inRect = (p, r, m = 0) => p.x >= r.x - m && p.x <= r.x + r.w + m && p.y >= r.y - m && p.y <= r.y + r.h + m;
+
+  // Botón del título para cambiar entre modo celular y modo computadora
+  function toggleRect() { const w = 330, h = 64; return { x: World.W - 24 - w, y: 22, w, h }; }
+
+  function setMode(v, save) {
+    on = v;
+    pts.clear();
+    taps = [];
+    if (save) { pref = v ? 'tactil' : 'normal'; try { localStorage.setItem('cazadores-modo', pref); } catch (e) { /* sin almacenamiento */ } }
+    Game.lobby = []; Game.lobbyT = {}; Game.countdown = 0;
+    resize();
+  }
 
   // ─── Dónde está cada botón (coordenadas del juego) ───
   function rects() {
@@ -49,24 +70,32 @@ const Touch = (() => {
     return { kind: 'ok' };
   }
 
-  if (on) {
-    window.addEventListener('pointerdown', e => {
-      const p = toGame(e), h = hit(p);
-      pts.set(e.pointerId, { x: p.x, y: p.y, spin: h.kind === 'spin' });
-      taps.push(h);
-    });
-    window.addEventListener('pointermove', e => {
-      const d = pts.get(e.pointerId);
-      if (d) Object.assign(d, toGame(e));
-    });
-    const up = e => pts.delete(e.pointerId);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-    window.addEventListener('blur', () => pts.clear());
-    // que el navegador no haga zoom ni mueva la página al tocar
-    for (const ev of ['touchstart', 'touchmove', 'gesturestart', 'dblclick']) {
-      document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+  window.addEventListener('pointerdown', e => {
+    if (showToggle && Game.state === 'title' && !(on && portrait()) && inRect(toGame(e), toggleRect(), 6)) {
+      setMode(!on, true);
+      swallow = e.pointerType === 'mouse';
+      return;
     }
+    if (!on) {
+      // el primer toque con el dedo pasa solo al modo táctil (si nadie eligió otro modo y no hay partida)
+      if (e.pointerType !== 'touch' || pref || Game.state === 'play') return;
+      setMode(true, false);
+    }
+    const p = toGame(e), h = hit(p);
+    pts.set(e.pointerId, { x: p.x, y: p.y, spin: h.kind === 'spin' });
+    taps.push(h);
+  });
+  window.addEventListener('pointermove', e => {
+    const d = pts.get(e.pointerId);
+    if (d) Object.assign(d, toGame(e));
+  });
+  const up = e => pts.delete(e.pointerId);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+  window.addEventListener('blur', () => pts.clear());
+  // que el navegador no haga zoom ni mueva la página al tocar
+  for (const ev of ['touchstart', 'touchmove', 'gesturestart', 'dblclick']) {
+    document.addEventListener(ev, e => { if (on) e.preventDefault(); }, { passive: false });
   }
 
   // Llena el estado del dispositivo 'touch' (mismo formato que los controles y el teclado)
@@ -214,6 +243,23 @@ const Touch = (() => {
     txt(ctx, 'El juego es en horizontal', cx, cy + 310 * s, { size: 54 * s, weight: 700, align: 'center', color: T.soft });
   }
 
+  function drawToggle(ctx) {
+    if (!showToggle) return;
+    const r = toggleRect(), ix = r.x + 40, iy = r.y + r.h / 2;
+    panel(ctx, r.x, r.y, r.w, r.h, { r: r.h / 2, fill: T.panelStrong });
+    ctx.save();
+    ctx.strokeStyle = T.text; ctx.fillStyle = T.text; ctx.lineWidth = 3.5;
+    if (!on) { // teléfono
+      rrect(ctx, ix - 11, iy - 19, 22, 38, 5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ix, iy + 12, 2.5, 0, TAU); ctx.fill();
+    } else {   // monitor
+      rrect(ctx, ix - 19, iy - 16, 38, 25, 4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ix - 10, iy + 17); ctx.lineTo(ix + 10, iy + 17); ctx.stroke();
+    }
+    ctx.restore();
+    txt(ctx, on ? 'Modo computadora' : 'Modo celular', r.x + 72, iy + 1, { size: 24, weight: 800, base: 'middle', color: T.text });
+  }
+
   function drawTitle(ctx, G, t) {
     const W = World, cx = W.W / 2, oy = Math.max(0, (W.H - MIN_H) / 2);
     txt(ctx, 'CAZADORES', cx, oy + 100, { size: 96, weight: 900, align: 'center', color: T.title, glow: T.glow, blur: 30 });
@@ -232,6 +278,7 @@ const Touch = (() => {
     }
     txt(ctx, 'IFUNAM · Día de Puertas Abiertas', 30, W.H - 18, { size: 22, weight: 700, color: T.muted });
     if (G.record.score > 0) txt(ctx, `Récord de hoy: ${fmt(G.record.score)}`, W.W - 30, W.H - 18, { size: 22, weight: 800, align: 'right', color: T.gold });
+    drawToggle(ctx);
   }
 
   function drawResults(ctx, G, t) {
@@ -269,7 +316,9 @@ const Touch = (() => {
   }
 
   return {
-    on, COL, MIN_W, MIN_H, portrait, poll, arrow,
-    drawHUD, drawPause, drawRotate, drawTitle, drawResults,
+    get on() { return on; },
+    COL, MIN_W, MIN_H, portrait, poll, arrow,
+    drawHUD, drawPause, drawRotate, drawTitle, drawResults, drawToggle,
+    eatClick() { const s = swallow; swallow = false; return s; },
   };
 })();
