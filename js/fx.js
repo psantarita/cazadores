@@ -37,7 +37,7 @@ function glow(ctx, x, y, r, color, a = 1) {
 const Drops = {
   list: [],
   add(x, y, r, color, life, a = 0.8) {
-    if (this.list.length > 9000) return;
+    if (this.list.length > (Touch.on ? 5000 : 9000)) return; // menos gotitas en el celular
     this.list.push({ x, y, r, color, life, max: life, a, vx: (Math.random() - 0.5) * 5, vy: 2 + Math.random() * 6 });
   },
   update(dt) {

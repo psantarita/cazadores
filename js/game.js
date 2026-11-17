@@ -9,13 +9,15 @@ let VIEW_SCALE = 1;
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const maxPx = 2560 * 1440;
+  const maxPx = Touch.on ? 1920 * 1080 : 2560 * 1440;
   if (w * h * dpr * dpr > maxPx) dpr = Math.sqrt(maxPx / (w * h));
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
   const aspect = w / h;
-  const LW = aspect >= 4 / 3 ? 1080 * aspect : 1440;
-  const LH = aspect >= 4 / 3 ? 1080 : 1440 / aspect;
+  let LW = aspect >= 4 / 3 ? 1080 * aspect : 1440;
+  let LH = aspect >= 4 / 3 ? 1080 : 1440 / aspect;
+  // en celulares la pantalla lógica es más chica: todo se dibuja más grande
+  if (Touch.on) { LH = Math.max(Touch.MIN_H, Touch.MIN_W / aspect); LW = LH * aspect; }
   VIEW_SCALE = canvas.width / LW;
   World.resize(LW, LH);
   Fog.init(LW, LH);
@@ -176,7 +178,7 @@ const Game = {
       if (this.lobby.includes(s.id)) {
         // presionar A otra vez empieza de inmediato
         if (this.titleT - this.lobbyT[s.id] > 0.6) { this.startGame(); return; }
-      } else if (this.lobby.length < 2) {
+      } else if (this.lobby.length < this.maxPlayers()) {
         this.lobby.push(s.id);
         this.lobbyT[s.id] = this.titleT;
         this.countdown = this.lobby.length === 1 ? 6 : Math.min(this.countdown, 3);
@@ -193,12 +195,15 @@ const Game = {
   updatePlay(dt) {
     const devs = this.players.map(p => Input.get(p.dev)).filter(Boolean);
     // unirse a media partida
-    if (this.players.length < 2 && !this.ending) {
+    if (this.players.length < this.maxPlayers() && !this.ending) {
       for (const s of Input.all()) {
         if (s.ok && !this.players.some(p => p.dev === s.id)) { this.addPlayer(s.id); break; }
       }
     }
+    // con el teléfono parado se pausa solo (sale el aviso para girarlo)
+    if (Touch.on && Touch.portrait() && !this.paused && !this.card && !this.ending) { this.paused = true; Sfx.muffle(true); }
     // pausa, inactividad y salida
+    if (devs.some(s => s.pressed.exit)) { this.toTitle(); return; }
     if (!this.card && !this.ending && devs.some(s => s.pressed.start)) { this.paused = !this.paused; Sfx.select(); Sfx.muffle(this.paused); }
     if (devs.some(s => s.active)) this.idleT = 0; else this.idleT += dt;
     if (this.idleT > 40) { this.toTitle(); return; }
@@ -297,7 +302,10 @@ const Game = {
     }
   },
 
-  // con qué juega cada quien: 'pad', 'kbm' o 'kb2' (para mostrar los botones o teclas correctos)
+  // en el celular juega una sola persona
+  maxPlayers() { return Touch.on ? 1 : 2; },
+
+  // con qué juega cada quien: 'pad', 'kbm', 'kb2' o 'touch' (para mostrar los botones o teclas correctos)
   kinds() {
     const k = [...new Set(this.players.map(p => p.kind))];
     return k.length ? k : ['pad'];
@@ -497,7 +505,7 @@ const Game = {
       Sparks.draw(ctx);
       Texts.draw(ctx);
       drawVignette(ctx);
-      drawHUD(ctx, this, t);
+      if (Touch.on) Touch.drawHUD(ctx, this, t); else drawHUD(ctx, this, t);
       drawToast(ctx, this.toastCur);
       drawBanner(ctx, this.banner);
       if (this.ending) {
@@ -505,7 +513,7 @@ const Game = {
         ctx.fillRect(-40, -40, W.W + 80, W.H + 80);
       }
       if (this.card) drawCard(ctx, this.card);
-      if (this.paused) drawPause(ctx);
+      if (this.paused) { if (Touch.on) Touch.drawPause(ctx); else drawPause(ctx); }
     } else {
       Drops.draw(ctx);
       drawParticles(ctx, t);
@@ -514,6 +522,7 @@ const Game = {
       if (this.state === 'title') drawTitle(ctx, this, t);
       else drawResults(ctx, this, t);
     }
+    if (Touch.on && Touch.portrait()) Touch.drawRotate(ctx, t);
   },
 };
 
@@ -531,11 +540,25 @@ function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
   else document.documentElement.requestFullscreen?.().catch(() => {});
 }
-window.addEventListener('pointerdown', () => {
-  if (!Sfx.running()) Input.discardClicks(); // ese clic sólo activa el sonido
+// el sonido y la pantalla completa sólo se permiten tras un clic o un toque
+function userGesture() {
   Sfx.unlock();
-  if (firstClick) { firstClick = false; if (!document.fullscreenElement) toggleFullscreen(); }
+  if (firstClick) {
+    firstClick = false;
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen()
+        .then(() => { if (Touch.on) screen.orientation?.lock?.('landscape').catch(() => {}); })
+        .catch(() => {});
+    }
+  }
+}
+window.addEventListener('pointerdown', e => {
+  if (!Sfx.running() && !Touch.on) Input.discardClicks(); // ese clic sólo activa el sonido
+  if (e.pointerType === 'mouse') userGesture();
 });
+// en pantallas táctiles el navegador cuenta el gesto al levantar el dedo
+window.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') userGesture(); });
+window.addEventListener('touchend', userGesture);
 window.addEventListener('keydown', e => {
   Sfx.unlock();
   if (e.code === 'KeyF') toggleFullscreen();

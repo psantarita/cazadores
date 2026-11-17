@@ -103,6 +103,11 @@ function okParts(kinds) {
   return parts;
 }
 
+// "Presiona [A] para continuar" o, en el celular, "Toca para continuar"
+function okLine(kinds, what) {
+  return kinds.includes('touch') ? [`Toca para ${what.toLowerCase()}`] : [...okParts(kinds), what];
+}
+
 const KEY_GREY = '#3c4d6b';
 
 // Texto con botones y teclas incrustados: "Presiona [A] para jugar"
@@ -314,11 +319,21 @@ function drawSources(ctx, t) {
     ctx.fillStyle = '#18212f'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = col; ctx.stroke();
     trefoil(ctx, 0, 0, 17);
-    // etiqueta del lado de afuera
-    const right = s.x >= W.cx, lx = right ? 50 : -50, al2 = right ? 'left' : 'right';
-    txt(ctx, s.def.short, lx, -2, { size: 24, weight: 800, align: al2, color: T.text, stroke: T.outline, strokeW: 5 });
+    // etiqueta del lado de afuera (en el celular, abajo, para dejar libres los lados)
+    const below = Touch.on, right = s.x >= W.cx;
+    const lx = below ? 0 : right ? 50 : -50, al2 = below ? 'center' : right ? 'left' : 'right';
+    const ly1 = below ? 52 : -2, ly2 = below ? 80 : 26;
+    txt(ctx, s.def.short, lx, ly1, { size: 24, weight: 800, align: al2, color: T.text, stroke: T.outline, strokeW: 5 });
     if (W.real) {
-      txt(ctx, '¿ ? ?', lx, 26, { size: 22, weight: 800, align: al2, color: T.muted });
+      txt(ctx, '¿ ? ?', lx, ly2, { size: 22, weight: 800, align: al2, color: T.muted });
+    } else if (below) {
+      const syms = s.def.emits.map(k => PTYPES[k]);
+      const ws = syms.map(p => textW(ctx, p.sym, 26, 800));
+      let x = -(ws.reduce((a, b) => a + b, 0) + 8 * (syms.length - 1)) / 2;
+      syms.forEach((p, i) => {
+        txt(ctx, p.sym, x, ly2, { size: 26, weight: 800, color: p.color, stroke: T.outline, strokeW: 5 });
+        x += ws[i] + 8;
+      });
     } else {
       const syms = s.def.emits;
       let x = lx;
@@ -504,21 +519,24 @@ function drawToast(ctx, toast) {
   const W = World, side = hudSide();
   const a = clamp(toast.t / 0.3, 0, 1) * clamp((toast.dur - toast.t) / 0.4, 0, 1);
   const kind = { ojo: ['¡OJO!', T.warn], bien: ['¡BIEN!', T.good], dato: ['DATO', T.info] }[toast.kind] || ['DATO', T.info];
-  const kc = kind[1];
-  const maxW = Math.min(1150, W.W - 2 * (side + 48));
-  const lines = wrap(ctx, toast.text, maxW - 140, 23, 600);
-  const tw = Math.max(...lines.map(l => textW(ctx, l, 23, 600)));
-  const w = Math.min(maxW, tw + 140), h = 22 + lines.length * 30;
+  const kc = kind[1], k = Touch.on ? 1.25 : 1, fs = 23 * k, lh = 30 * k, pad = 140 * k;
+  // en el celular, entre las dos columnas de botones
+  const maxW = Touch.on ? W.W - 2 * (Touch.COL + 20) : Math.min(1150, W.W - 2 * (side + 48));
+  const lines = wrap(ctx, toast.text, maxW - pad, fs, 600);
+  const tw = Math.max(...lines.map(l => textW(ctx, l, fs, 600)));
+  const w = Math.min(maxW, tw + pad), h = 22 * k + lines.length * lh;
   const x = W.W / 2 - w / 2;
   // abajo, salvo que tape una fuente; entonces arriba
-  let y = W.H - 24 - 70 - 14 - h;
-  if (World.sources.some(s => Math.abs(s.x - W.W / 2) < w / 2 + 60 && s.y + 40 > y)) y = 118;
+  const covers = yy => World.sources.some(s => Math.abs(s.x - W.W / 2) < w / 2 + 60 && s.y + (Touch.on ? 100 : 40) > yy && s.y - 60 < yy + h);
+  let y = Touch.on ? W.H - 20 - h : W.H - 24 - 70 - 14 - h;
+  const top = Touch.on ? 76 : 118;
+  if (covers(y) && !(Touch.on && covers(top))) y = top;
   ctx.save();
   ctx.globalAlpha = a;
   panel(ctx, x, y, w, h, { fill: T.panelStrong, stroke: rgba(kc, 0.65), r: 22 });
-  rrect(ctx, x + 12, y + h / 2 - 16, 90, 32, 16); ctx.fillStyle = kc; ctx.fill();
-  txt(ctx, kind[0], x + 57, y + h / 2 + 1, { size: 17, weight: 900, align: 'center', base: 'middle', color: '#08111f' });
-  lines.forEach((l, i) => txt(ctx, l, x + 118, y + 26 + i * 30, { size: 23, weight: 600, base: 'middle', color: T.text }));
+  rrect(ctx, x + 12, y + h / 2 - 16 * k, 90 * k, 32 * k, 16 * k); ctx.fillStyle = kc; ctx.fill();
+  txt(ctx, kind[0], x + 12 + 45 * k, y + h / 2 + 1, { size: 17 * k, weight: 900, align: 'center', base: 'middle', color: '#08111f' });
+  lines.forEach((l, i) => txt(ctx, l, x + 118 * k, y + 11 * k + lh / 2 + i * lh, { size: fs, weight: 600, base: 'middle', color: T.text }));
   ctx.restore();
 }
 
@@ -534,8 +552,8 @@ function drawBanner(ctx, b) {
   ctx.fillRect(0, W.cy - 95, W.W, 190);
   const s = 0.85 + 0.15 * easeOutBack(clamp(b.t / 0.4, 0, 1));
   txt(ctx, b.text, W.W / 2, W.cy - 18, { size: 74 * s, weight: 900, align: 'center', color: b.color || T.text, glow: b.color || T.glow, blur: 24 });
-  if (b.sub) txt(ctx, b.sub, W.W / 2, W.cy + 38, { size: 34, weight: 800, align: 'center', color: T.soft });
-  if (b.hint) txt(ctx, b.hint, W.W / 2, W.cy + 78, { size: 24, weight: 600, align: 'center', color: T.gold });
+  if (b.sub) txt(ctx, b.sub, W.W / 2, W.cy + 38, { size: Touch.on ? 38 : 34, weight: 800, align: 'center', color: T.soft });
+  if (b.hint) txt(ctx, b.hint, W.W / 2, W.cy + (Touch.on ? 84 : 78), { size: Touch.on ? 30 : 24, weight: Touch.on ? 700 : 600, align: 'center', color: T.gold });
   ctx.restore();
 }
 
@@ -725,6 +743,7 @@ function drawIonization(ctx, x, y, w, h, t) {
 
 function drawHowTo(ctx, x, y, w, h, t) {
   const cy = y + h * 0.42, col = w / 3;
+  if (Touch.on) { drawHowToTouch(ctx, x, y, w, h, t, cy, col); return; }
   // stick
   const sx = x + col * 0.5;
   ctx.beginPath(); ctx.arc(sx, cy, 52, 0, TAU);
@@ -754,6 +773,48 @@ function drawHowTo(ctx, x, y, w, h, t) {
   }
   txt(ctx, 'Elige el material', bx, y + h - 50, { size: 26, weight: 800, align: 'center' });
   txt(ctx, 'A B X Y  o  teclas 1 2 3 4', bx, y + h - 20, { size: 22, weight: 600, align: 'center', color: T.soft });
+  // célula
+  const cx = x + col * 2.5;
+  ctx.beginPath(); ctx.arc(cx, cy, 50, 0, TAU);
+  ctx.fillStyle = rgba(T.memb, 0.15); ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = T.memb; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 22, 0, TAU);
+  ctx.fillStyle = rgba(T.nucleus, 0.3); ctx.fill(); ctx.strokeStyle = T.nucleus; ctx.lineWidth = 2; ctx.stroke();
+  for (let i = 0; i < 7; i++) {
+    const xx = cx - 15 + i * 5, yy = Math.sin(i + t * 2) * 7;
+    ctx.strokeStyle = i % 2 ? T.rungA : T.info;
+    ctx.beginPath(); ctx.moveTo(xx, cy + yy); ctx.lineTo(xx, cy - yy); ctx.stroke();
+  }
+  txt(ctx, 'Protege el ADN', cx, y + h - 50, { size: 26, weight: 800, align: 'center' });
+  txt(ctx, 'de la célula', cx, y + h - 20, { size: 22, weight: 600, align: 'center', color: T.soft });
+}
+
+// Cómo se juega en el celular: flechas a la izquierda y botones de material a la derecha
+function drawHowToTouch(ctx, x, y, w, h, t, cy, col) {
+  const pc = PLAYER_COLORS[0];
+  // flechas: se ilumina la que se está "apretando" y el escudo gira hacia ese lado
+  const sx = x + col * 0.5, sw = Math.sin(t * 1.4), a = -Math.PI / 2 + Math.sin(t * 1.4 - 1.2) * 1.4;
+  for (const v of [-1, 1]) {
+    const on = v * sw > 0.3, bx = sx + v * 50 - 42, by = cy - 52;
+    panel(ctx, bx, by, 84, 104, { r: 18, fill: on ? rgba(pc, 0.35) : T.panelStrong, stroke: on ? pc : T.panelStroke, lw: on ? 3 : 2 });
+    Touch.arrow(ctx, bx + 42, by + 52, 24, v, on ? pc : T.text);
+  }
+  ctx.strokeStyle = pc; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(sx, cy, 124, a - 0.4, a + 0.4); ctx.stroke(); ctx.lineCap = 'butt';
+  txt(ctx, 'Gira tu escudo', sx, y + h - 50, { size: 26, weight: 800, align: 'center' });
+  txt(ctx, 'mantén las flechas de la izquierda', sx, y + h - 20, { size: 22, weight: 600, align: 'center', color: T.soft });
+  // botones de material
+  const bx = x + col * 1.5, cw = 112, ch = 66, gap = 8;
+  const ty = ['alpha', 'beta', 'gamma', 'neutron'];
+  MATERIALS.forEach((m, i) => {
+    const px = bx - cw - gap / 2 + (i % 2) * (cw + gap), py = cy - ch - gap / 2 + (i >> 1) * (ch + gap);
+    const sel = Math.floor(t / 1.5) % 4 === i;
+    panel(ctx, px, py, cw, ch, { r: 12, fill: rgba(XBOX[m.btn], sel ? 0.9 : 0.25), stroke: sel ? pc : rgba(XBOX[m.btn], 0.8), lw: sel ? 4 : 2 });
+    const tc = sel ? (m.btn === 'Y' ? '#2a2200' : '#ffffff') : T.text;
+    txt(ctx, m.name, px + cw / 2, py + 26, { size: 19, weight: 900, align: 'center', base: 'middle', color: tc });
+    txt(ctx, PTYPES[ty[i]].sym, px + cw / 2, py + 50, { size: 20, weight: 900, align: 'center', base: 'middle', color: PTYPES[ty[i]].color, stroke: T.outline, strokeW: 4 });
+  });
+  txt(ctx, 'Elige el material', bx, y + h - 50, { size: 26, weight: 800, align: 'center' });
+  txt(ctx, 'con los botones de la derecha', bx, y + h - 20, { size: 22, weight: 600, align: 'center', color: T.soft });
   // célula
   const cx = x + col * 2.5;
   ctx.beginPath(); ctx.arc(cx, cy, 50, 0, TAU);
@@ -823,7 +884,7 @@ function drawCard(ctx, card) {
   // continuar
   const ready = card.t > 1.4;
   const k = clamp(card.t / card.auto, 0, 1);
-  richLine(ctx, [...okParts(Game.kinds()), 'Continuar'], x + w - 40, y + h - 58, 26,
+  richLine(ctx, okLine(Game.kinds(), 'Continuar'), x + w - 40, y + h - 58, 26,
     { align: 'right', alpha: ready ? 0.6 + 0.4 * Math.sin(card.t * 5) : 0.3 });
   // tiempo restante antes de continuar solo
   rrect(ctx, x + 40, y + h - 14, (w - 80) * (1 - k), 4, 2);
@@ -833,13 +894,9 @@ function drawCard(ctx, card) {
 
 // ─── Pantalla de título ───
 
-function drawTitle(ctx, G, t) {
-  const W = World, cx = W.W / 2;
-  txt(ctx, 'CAZADORES', cx, 178, { size: 122, weight: 900, align: 'center', color: T.title, glow: T.glow, blur: 34 });
-  txt(ctx, 'DE LO INVISIBLE', cx, 262, { size: 64, weight: 800, align: 'center', color: T.title2, glow: T.glow, blur: 20 });
-  txt(ctx, 'Descubre cómo interactúa la radiación ionizante con la materia', cx, 318, { size: 28, weight: 500, align: 'center', color: T.soft });
-  // panel informativo que va cambiando
-  const pw = Math.min(1120, W.W - 120), ph = 390, px = cx - pw / 2, py = 352;
+// Panel informativo que va cambiando (cómo se juega, cómo vemos lo invisible, qué frena a cada radiación)
+function drawInfoPanel(ctx, G, t, px, py, pw, ph) {
+  const cx = px + pw / 2;
   panel(ctx, px, py, pw, ph, { fill: T.panel });
   const fadeA = clamp(G.panelT / 0.4, 0, 1) * clamp((G.panelDur - G.panelT) / 0.4, 0, 1);
   ctx.save();
@@ -848,12 +905,23 @@ function drawTitle(ctx, G, t) {
   txt(ctx, titles[G.panel], cx, py + 46, { size: 28, weight: 900, align: 'center', color: T.gold });
   if (G.panel === 0) drawHowTo(ctx, px, py + 66, pw, ph - 86, t);
   else if (G.panel === 1) drawIonization(ctx, px, py + 60, pw, ph - 70, G.panelT);
-  else drawPenetration(ctx, px + 70, py + 62, pw - 140, ph - 80, ['alpha', 'beta', 'gamma', 'neutron'], t);
+  else drawPenetration(ctx, px + 70, py + 62, pw - 140, ph - 80, ['alpha', 'beta', 'gamma', 'neutron'], t, Touch.on ? 'touch' : 'pad');
   ctx.restore();
   for (let i = 0; i < 3; i++) {
     ctx.beginPath(); ctx.arc(cx - 20 + i * 20, py + ph - 14, 4, 0, TAU);
     ctx.fillStyle = i === G.panel ? T.gold : T.track; ctx.fill();
   }
+}
+
+function drawTitle(ctx, G, t) {
+  if (Touch.on) { Touch.drawTitle(ctx, G, t); return; }
+  const W = World, cx = W.W / 2;
+  txt(ctx, 'CAZADORES', cx, 178, { size: 122, weight: 900, align: 'center', color: T.title, glow: T.glow, blur: 34 });
+  txt(ctx, 'DE LO INVISIBLE', cx, 262, { size: 64, weight: 800, align: 'center', color: T.title2, glow: T.glow, blur: 20 });
+  txt(ctx, 'Descubre cómo interactúa la radiación ionizante con la materia', cx, 318, { size: 28, weight: 500, align: 'center', color: T.soft });
+  // panel informativo que va cambiando
+  const pw = Math.min(1120, W.W - 120), ph = 390, px = cx - pw / 2, py = 352;
+  drawInfoPanel(ctx, G, t, px, py, pw, ph);
   // lugares para jugadores
   const sw = 440, sh = 116, gap = 40, sy = 770;
   for (let i = 0; i < 2; i++) {
@@ -889,6 +957,7 @@ function drawTitle(ctx, G, t) {
 // ─── Resultados ───
 
 function drawResults(ctx, G, t) {
+  if (Touch.on) { Touch.drawResults(ctx, G, t); return; }
   const W = World, r = G.results, cx = W.W / 2;
   const a = clamp(r.t / 0.6, 0, 1);
   ctx.save();
@@ -926,7 +995,7 @@ function drawResults(ctx, G, t) {
   panel(ctx, px, py, pw, ph, { fill: T.panel });
   txt(ctx, 'LO QUE APRENDISTE', cx, py + 36, { size: 22, weight: 900, align: 'center', color: T.muted });
   drawPenetration(ctx, px + 50, py + 46, pw - 100, ph - 58, ['alpha', 'beta', 'gamma', 'neutron'], t, G.kinds()[0]);
-  if (r.t > 3) richLine(ctx, [...okParts(G.kinds()), 'Volver al inicio'], cx, W.H - 44, 28, { align: 'center', alpha: 0.6 + 0.4 * Math.sin(t * 4) });
+  if (r.t > 3) richLine(ctx, okLine(G.kinds(), 'Volver al inicio'), cx, W.H - 44, 28, { align: 'center', alpha: 0.6 + 0.4 * Math.sin(t * 4) });
   ctx.restore();
 }
 

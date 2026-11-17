@@ -223,7 +223,9 @@ function spawnSource(id) {
   let ang, tries = 0;
   do { ang = rand(0, TAU); tries++; }
   while (tries < 40 && W.sources.some(s => Math.abs(angDiff(s.ang, ang)) < 0.8));
-  const rx = Math.min(W.W / 2 - 170, 800), ry = Math.min(W.H / 2 - 200, 330);
+  // en el celular las fuentes quedan entre las dos columnas de botones
+  const rx = Touch.on ? Math.min(W.W / 2 - Touch.COL - 95, 800) : Math.min(W.W / 2 - 170, 800);
+  const ry = Touch.on ? Math.min(W.H / 2 - 95, 330) : Math.min(W.H / 2 - 200, 330);
   const s = {
     id, def, ang,
     x: W.cx + Math.cos(ang) * rx, y: W.cy + Math.sin(ang) * ry,

@@ -14,10 +14,10 @@ const PLAYER_NAMES = ['JUGADOR 1', 'JUGADOR 2'];
 // Teclas de material para quien juega con teclado (en el orden de MATERIALS)
 const KEY_LABELS = { kbm: ['1', '2', '3', '4'], kb2: ['Z', 'X', 'C', 'V'] };
 const joinOr = arr => arr.filter(Boolean).join(' o ');
-// Pistas que dependen de con qué juega cada quien ('pad', 'kbm', 'kb2')
+// Pistas que dependen de con qué juega cada quien ('pad', 'kbm', 'kb2', 'touch')
 const HINTS = {
-  aim: kinds => `Gira tu escudo hacia la fuente con ${joinOr(kinds.map(k => ({ pad: 'el stick ← →', kbm: 'el ratón o las flechas ← →', kb2: 'A / D' })[k]))}`,
-  switch: kinds => `Cambia de material con ${joinOr(kinds.map(k => ({ pad: 'A B X Y', kbm: 'las teclas 1 2 3 4 o el clic', kb2: 'Z X C V' })[k]))}`,
+  aim: kinds => `Gira tu escudo hacia la fuente con ${joinOr(kinds.map(k => ({ pad: 'el stick ← →', kbm: 'el ratón o las flechas ← →', kb2: 'A / D', touch: 'las flechas de la izquierda' })[k]))}`,
+  switch: kinds => `Cambia de material con ${joinOr(kinds.map(k => ({ pad: 'A B X Y', kbm: 'las teclas 1 2 3 4 o el clic', kb2: 'Z X C V', touch: 'los botones de la derecha' })[k]))}`,
 };
 
 // Velocidad de giro del escudo (radianes por segundo) con el material más ligero.

@@ -7,7 +7,8 @@
      mat     material elegido directamente este cuadro (0-3) o -1
      cycle   pasar al material siguiente (+1) o anterior (-1)
      active  hubo actividad (para detectar inactividad)
-   Dispositivos: 'gp0'… (controles), 'kbm' (teclado y ratón), 'kb2' (segundo jugador con teclado). */
+   Dispositivos: 'gp0'… (controles), 'kbm' (teclado y ratón), 'kb2' (segundo jugador con teclado)
+   y 'touch' (pantalla táctil, ver touch.js; ahí el ratón cuenta como dedo). */
 
 const Input = (() => {
   const keys = new Set();
@@ -19,12 +20,13 @@ const Input = (() => {
   // Ratón: posición normalizada (0-1), clics y rueda acumulados entre cuadros
   const mouse = { x: 0.5, y: 0.5, aim: false, moved: -1e9, left: 0, right: 0, wheel: 0, wheelAt: 0, stepAt: 0 };
   window.addEventListener('mousemove', e => {
+    if (Touch.on) return;
     mouse.x = e.clientX / window.innerWidth;
     mouse.y = e.clientY / window.innerHeight;
     mouse.aim = true;
     mouse.moved = performance.now();
   });
-  window.addEventListener('mousedown', e => { if (e.button === 0) mouse.left++; else if (e.button === 2) mouse.right++; });
+  window.addEventListener('mousedown', e => { if (Touch.on) return; if (e.button === 0) mouse.left++; else if (e.button === 2) mouse.right++; });
   window.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('wheel', e => { mouse.wheel += e.deltaY; mouse.wheelAt = performance.now(); e.preventDefault(); }, { passive: false });
 
@@ -128,9 +130,20 @@ const Input = (() => {
       if (s.kind === 'pad' && !seen.has(id) && s.connected) Object.assign(s, blank(id, 'pad', s.name), { connected: false });
     }
     for (const id in KB) pollKeyboard(id, now);
+    if (Touch.on) {
+      let s = states.get('touch');
+      if (!s) { s = blank('touch', 'touch', 'Pantalla táctil'); states.set('touch', s); }
+      Touch.poll(s);
+    }
   }
 
   function rumble(id, strong, weak, ms) {
+    // en el celular, vibración sólo para los golpes fuertes (Android; el iPhone no deja)
+    if (id === 'touch') {
+      const can = navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive);
+      if (strong >= 0.5 && can) navigator.vibrate(Math.round(ms * 0.6));
+      return;
+    }
     if (!id || !id.startsWith('gp')) return;
     const gp = (navigator.getGamepads ? navigator.getGamepads() : [])[+id.slice(2)];
     const act = gp && gp.vibrationActuator;

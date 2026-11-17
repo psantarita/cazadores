@@ -12,6 +12,8 @@ const Sfx = (() => {
     if (ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
+    // iPhone: que suene aunque el teléfono esté en modo silencio
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* no disponible */ }
     ctx = new AC();
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
