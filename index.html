@@ -9,6 +9,19 @@
   canvas { display: block; width: 100vw; height: 100vh; }
   body.nocursor, body.playcursor { cursor: none; }
 </style>
+<!-- Google Tag Manager (Analytics): sólo en la página publicada en GitHub.
+     En la expo el juego corre sin internet, así que ahí no se carga ni cuenta partidas. -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  if (location.hostname.endsWith('github.io')) {
+    gtag('js', new Date());
+    var gtm = document.createElement('script');
+    gtm.async = true;
+    gtm.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-M82H6CQS';
+    document.head.appendChild(gtm);
+  }
+</script>
 </head>
 <body>
 <canvas id="juego"></canvas>
