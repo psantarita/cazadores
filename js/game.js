@@ -117,7 +117,7 @@ const Game = {
   },
 
   showCard(id, then) {
-    this.card = { id, t: 0, auto: 16, then };
+    this.card = { id, t: 0, then };
     Sfx.card();
     Sfx.muffle(true);
   },
@@ -206,14 +206,15 @@ const Game = {
     if (devs.some(s => s.pressed.exit)) { this.toTitle(); return; }
     if (!this.card && !this.ending && devs.some(s => s.pressed.start)) { this.paused = !this.paused; Sfx.select(); Sfx.muffle(this.paused); }
     if (devs.some(s => s.active)) this.idleT = 0; else this.idleT += dt;
-    if (this.idleT > 40) { this.toTitle(); return; }
+    // sin nadie jugando vuelve al título (con una tarjeta abierta se espera más: puede que estén leyendo)
+    if (this.idleT > (this.card ? 120 : 40)) { this.toTitle(); return; }
     if (devs.some(s => s.down.back)) { this.backHold += dt; if (this.backHold > 1.5) { this.toTitle(); return; } }
     else this.backHold = 0;
     if (this.paused) return;
 
     if (this.card) {
       this.card.t += dt;
-      if ((this.card.t > 1.4 && devs.some(s => s.ok)) || this.card.t > this.card.auto) {
+      if (this.card.t > CARD_READY && devs.some(s => s.ok)) {
         const then = this.card.then;
         this.card = null;
         Sfx.muffle(false);

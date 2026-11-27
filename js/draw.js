@@ -349,7 +349,7 @@ function drawSources(ctx, t) {
 }
 
 function drawParticles(ctx, t) {
-  const real = World.real;
+  const real = World.real && REAL_WHITE;
   ctx.save();
   ctx.globalCompositeOperation = T.blend;
   for (const p of World.particles) {
@@ -881,14 +881,15 @@ function drawCard(ctx, card) {
     });
     txt(ctx, c.stop, x + 60, y + h - 56, { size: 28, weight: 800, base: 'middle', color: T.text });
   }
-  // continuar
-  const ready = card.t > 1.4;
-  const k = clamp(card.t / card.auto, 0, 1);
+  // continuar: la tarjeta espera a que alguien presione (no se cierra sola)
+  const ready = card.t > CARD_READY;
   richLine(ctx, okLine(Game.kinds(), 'Continuar'), x + w - 40, y + h - 58, 26,
     { align: 'right', alpha: ready ? 0.6 + 0.4 * Math.sin(card.t * 5) : 0.3 });
-  // tiempo restante antes de continuar solo
-  rrect(ctx, x + 40, y + h - 14, (w - 80) * (1 - k), 4, 2);
-  ctx.fillStyle = T.track; ctx.fill();
+  // barrita que se llena mientras no se puede continuar todavía
+  if (!ready) {
+    rrect(ctx, x + 40, y + h - 14, (w - 80) * clamp(card.t / CARD_READY, 0, 1), 4, 2);
+    ctx.fillStyle = T.track; ctx.fill();
+  }
   ctx.restore();
 }
 

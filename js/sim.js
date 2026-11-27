@@ -21,7 +21,7 @@ const World = {
   clear() { this.particles.length = 0; this.sources.length = 0; },
 };
 
-const trackColor = type => (World.real ? T.real : PTYPES[type].color);
+const trackColor = type => (World.real && REAL_WHITE ? T.real : PTYPES[type].color);
 
 function spawn(type, x, y, dir, o = {}) {
   const def = PTYPES[type] || {};
@@ -265,7 +265,8 @@ function updateSources(dt) {
       if (s.next <= 0) {
         emitFrom(s);
         s.left--;
-        s.next = rand(0.55, 0.95);
+        // las fuentes que emiten de todo (uranio) van más despacio para dar tiempo de cambiar de material
+        s.next = s.def.emits.length > 1 ? rand(0.9, 1.3) : rand(0.55, 0.95);
         if (s.left <= 0) { s.state = 'fade'; s.fade = 0; }
       }
     } else {

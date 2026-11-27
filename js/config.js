@@ -35,6 +35,12 @@ const MATERIALS = [
   { id: 'agua',     name: 'Agua',     btn: 'Y', speed: 0.74, thick: 17, fill: '#2d8cff' },
 ];
 
+// Oleada final (visión real): true = todas las trazas blancas como en una cámara de niebla de verdad (más difícil);
+// false = cada radiación conserva su color.
+const REAL_WHITE = false;
+// Segundos mínimos que se queda una tarjeta antes de poder cerrarla con A, clic o toque (no se cierra sola).
+const CARD_READY = 2.5;
+
 // Tipos de radiación. El color de la traza coincide con el botón del material ideal.
 // damage: daño al ADN si llega a la célula (las alfa y los neutrones dañan más: factor de ponderación).
 const PTYPES = {
@@ -136,8 +142,8 @@ const WAVES = [
     hint: 'El plomo es pesado: tu escudo girará más lento' },
   { title: 'NEUTRONES',        intro: 'neutron', duration: 30, pool: ['ambe', 'ambe', 'cs137', 'sr90', 'am241'],  gap: [2.1, 2.8], maxActive: 2,
     hint: 'Los neutrones atraviesan el plomo: usa agua' },
-  { title: 'Visión real',      intro: 'real',    duration: 34, pool: ['uranio', 'radon', 'ambe', 'cs137', 'sr90', 'co60'], gap: [2.2, 2.8], maxActive: 2, real: true,
-    hint: 'Reconoce cada radiación por la forma de su traza' },
+  { title: 'Visión real',      intro: 'real',    duration: 30, pool: ['uranio', 'radon', 'ambe', 'cs137', 'sr90', 'co60'], gap: [2.3, 3.0], maxActive: 1, real: true,
+    hint: 'Las fuentes no dicen qué emiten: mira el color y la forma de la traza' },
 ];
 
 // Tarjetas que presentan cada radiación
@@ -185,7 +191,7 @@ const CARDS = {
     kicker: 'OLEADA FINAL', title: 'Visión real: cámara de niebla', sym: '◉', type: null, btn: null,
     lines: [
       'En una cámara de niebla de verdad todas las trazas son blancas.',
-      'Ahora tendrás que reconocer cada radiación por la FORMA de su traza.',
+      'Aquí las dejamos de color para ayudarte, pero fíjate también en su FORMA.',
       'El mineral de uranio emite α, β y γ: ¡cambia de escudo rápido!',
     ],
     stop: 'Las fuentes ya no dicen qué emiten: ¡fíjate en la traza!',
